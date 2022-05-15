@@ -1,0 +1,246 @@
+# -*- coding: utf-8 -*-
+# !/usr/bin/python3
+
+# python3 -m pip install yagmail tweepy pdf2image --no-cache-dir
+# sudo apt install poppler-utils -y
+import datetime
+import json
+import os
+import urllib.request
+import urllib.parse
+import tweepy
+import yagmail
+import pdf2image
+import shutil
+import re
+
+import requests
+
+
+def get911(key):
+    with open('/home/pi/.911') as f:
+        data = json.load(f)
+    return data[key]
+
+
+CONSUMER_KEY = get911('TWITTER_FORMULAE_CONSUMER_KEY')
+CONSUMER_SECRET = get911('TWITTER_FORMULAE_CONSUMER_SECRET')
+ACCESS_TOKEN = get911('TWITTER_FORMULAE_ACCESS_TOKEN')
+ACCESS_TOKEN_SECRET = get911('TWITTER_FORMULAE_ACCESS_TOKEN_SECRET')
+EMAIL_USER = get911('EMAIL_USER')
+EMAIL_APPPW = get911('EMAIL_APPPW')
+EMAIL_RECEIVER = get911('EMAIL_RECEIVER')
+
+auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+api = tweepy.API(auth)
+
+
+def getResults(board):
+    # Download JSON Timing Results
+    if board == "timings":
+        results = json.loads(requests.get(timingsURL).content)
+    elif board == "notices":
+        results = json.loads(requests.get(noticesURL).content)
+    else:
+        results = {}
+
+    # Get last season && name
+    lastSeason = results["folders"][0]["children"][-1]
+    lastSeasonName, championshipDocs, eventDocs = lastSeason["name"], [], []
+
+    # Get last race
+    lastRace = lastSeason["children"][-1]
+    lastRaceName = lastRace["name"]
+
+    # Get Folder
+    for folder in lastRace["children"]:
+        if folder["name"] == "ABB FIA Formula E World Championship":
+            try:
+                if board == "timings":
+                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"][-1]["children"] if "pdf" == doc["extension"]]
+                elif board == "notices":
+                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if "pdf" == doc["extension"]]
+            except Exception:
+                pass
+
+        elif folder["name"] == "Event Information":
+            try:
+                eventDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if "pdf" == doc["extension"]]
+            except Exception:
+                pass
+
+    documents = {lastSeasonName: {lastRaceName: {"ABB FIA Formula E World Championship": championshipDocs, "Event Information": eventDocs}}}
+    return documents
+
+
+def getLog(board):
+    try:
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
+        with open(log_file) as inFile:
+            log = json.load(inFile)
+    except Exception:
+        log = {}
+
+    return log
+
+
+def parseDocuments(documents, board):
+    lastSeasonName, lastRaceName, newDocs = "", "", {}
+
+    # Load board log
+    log = getLog(board)
+
+    for lastSeasonName in documents.keys():
+        if lastSeasonName not in log.keys():
+            log[lastSeasonName] = {}
+
+        for lastRaceName in documents[lastSeasonName].keys():
+            if lastRaceName not in log[lastSeasonName].keys():
+                log[lastSeasonName][lastRaceName] = {}
+
+            for folderName, docs in documents[lastSeasonName][lastRaceName].items():
+                if folderName not in log[lastSeasonName][lastRaceName].keys():
+                    log[lastSeasonName][lastRaceName][folderName] = []
+
+                newDocs[folderName] = [doc for doc in docs if doc not in log[lastSeasonName][lastRaceName][folderName]]
+
+    return lastSeasonName, lastRaceName, newDocs, log
+
+
+def getScreenshots(pdfURL):
+    try:
+        # Reset tmpFolder
+        if os.path.exists(tmpFolder):
+            shutil.rmtree(tmpFolder)
+        os.mkdir(tmpFolder)
+
+        # Download PDF
+        pdfFile = os.path.join(tmpFolder, "tmp.pdf")
+        urllib.request.urlretrieve(pdfURL, pdfFile)
+
+        # Check what OS
+        if os.name == "nt":
+            pages = pdf2image.convert_from_path(poppler_path=r"poppler-win\Library\bin", pdf_path=pdfFile)
+        else:
+            pages = pdf2image.convert_from_path(pdf_path=pdfFile)
+
+        # Save the first four pages
+        for idx, page in enumerate(pages[0:4]):
+            jpgFile = os.path.join(tmpFolder, "tmp_" + str(idx) + ".jpg")
+            page.save(jpgFile)
+        hasPics = True
+    except Exception:
+        print("Failed to screenshot")
+        hasPics = False
+
+    return hasPics
+
+
+def tweet(tweetStr):
+    try:
+        imageFiles = sorted([os.path.join(tmpFolder, file) for file in os.listdir(tmpFolder) if file.split(".")[-1] == "jpg"])
+        media_ids = [api.media_upload(os.path.join(tmpFolder, image)).media_id_string for image in imageFiles]
+        api.update_status(status=tweetStr, media_ids=media_ids)
+        print("Tweeted")
+    except Exception as ex:
+        print("Failed to Tweet")
+        yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Failed to Tweet - " + os.path.basename(__file__), str(ex) + "\n\n" + tweetStr)
+
+
+def favTweets(tags, numbTweets):
+    tags = tags.replace(" ", " OR ")
+    tweets = tweepy.Cursor(api.search_tweets, q=tags).items(numbTweets)
+    tweets = [tw for tw in tweets]
+
+    for tw in tweets:
+        try:
+            tw.favorite()
+            print(str(tw.id) + " - Like")
+        except Exception as e:
+            print(str(tw.id) + " - " + str(e))
+            pass
+
+    return True
+
+
+def batchDelete():
+    print("Deleting all tweets from the account @" + api.verify_credentials().screen_name)
+    for status in tweepy.Cursor(api.user_timeline).items():
+        try:
+            api.destroy_status(status.id)
+        except Exception:
+            pass
+
+
+def postDocs(lastSeason, lastRace, documents, log, board):
+    hashtags = "#" + "".join(lastRace.split(" ")[1::]) + " #" + "".join(lastRace.split(" ")[1::]) + "EPrix"
+
+    # Iterate over new docs
+    for folder, docs in documents.items():
+        for doc in docs:
+            log[lastSeason][lastRace][folder].append(doc)
+
+            # Set title
+            postTitle = doc["name"]
+            postTitle = re.sub("[^a-zA-Z0-9 \n.]", " ", postTitle).replace(".PDF", "").replace(".pdf", "")
+            postTitle = re.sub('\\s+', ' ', postTitle)
+            print(postTitle)
+
+            # Set date
+            postDate = datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y/%m/%d %H:%m UTC")
+
+            # Screenshot DPF
+            pdfURL = doc["url"].replace(" ", "%20")
+            getScreenshots(pdfURL)
+
+            # Tweet!
+            tweet(postTitle + "\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
+            
+    # Get tweets -> Like them
+    favTweets(hashtags, 1)
+
+    # Save Log
+    logfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
+    with open(logfile, "w") as outFile:
+        json.dump(log, outFile, indent=2)
+
+
+def main():
+    print("getTimingResults")
+    timings = getResults("timings")
+    print("getNoticesResults")
+    notices = getResults("notices")
+
+    print("parseDocuments - timings")
+    lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog = parseDocuments(timings, "timings")
+    print("parseDocuments - notices")
+    lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog = parseDocuments(notices, "notices")
+    print()
+
+    print("postDocs - timings")
+    postDocs(lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog, "timings")
+    print()
+    print("postDocs - notices")
+    postDocs(lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog, "notices")
+
+    print("------------------")
+
+
+if __name__ == "__main__":
+    print("----------------------------------------------------")
+
+    # Set temp folder -> Create logs and tmp folder
+    tmpFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
+
+    # Set Results URLs
+    timingsURL = "https://results.fiaformulae.com/en/s3/feed/v2/results.json"
+    noticesURL = "https://results.fiaformulae.com/en/s3/feed/noticeboard/v2/results.json"
+
+    try:
+        main()
+    except Exception as ex:
+        print(ex)
+        yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Error - " + os.path.basename(__file__), str(ex))
+    finally:
+        print("End")
