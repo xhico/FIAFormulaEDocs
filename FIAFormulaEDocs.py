@@ -174,7 +174,7 @@ def batchDelete():
 
 
 def postDocs(lastSeason, lastRace, documents, log, board):
-    hashtags = "#" + "".join(lastRace.split(" ")[1::]) + " #" + "".join(lastRace.split(" ")[1::]) + "EPrix" + " #FormulaE"
+    hashtags = "#" + "".join(lastRace.split(" ")[1::]) + " #" + "".join(lastRace.split(" ")[1::]) + "EPrix" + " #FormulaE #ABBFormulaE"
 
     # Iterate over new docs
     for folder, docs in documents.items():
