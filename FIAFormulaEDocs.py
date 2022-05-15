@@ -58,15 +58,15 @@ def getResults(board):
         if folder["name"] == "ABB FIA Formula E World Championship":
             try:
                 if board == "timings":
-                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"][-1]["children"] if "pdf" == doc["extension"]]
+                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for subfolder in folder["children"] for doc in subfolder["children"] if doc["extension"] == "pdf"]
                 elif board == "notices":
-                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if "pdf" == doc["extension"]]
+                    championshipDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if doc["extension"] == "pdf"]
             except Exception:
                 pass
 
         elif folder["name"] == "Event Information":
             try:
-                eventDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if "pdf" == doc["extension"]]
+                eventDocs = [{"name": doc["name"], "url": doc["url"]} for doc in folder["children"] if doc["extension"] == "pdf"]
             except Exception:
                 pass
 
@@ -174,7 +174,7 @@ def batchDelete():
 
 
 def postDocs(lastSeason, lastRace, documents, log, board):
-    hashtags = "#" + "".join(lastRace.split(" ")[1::]) + " #" + "".join(lastRace.split(" ")[1::]) + "EPrix"
+    hashtags = "#" + "".join(lastRace.split(" ")[1::]) + " #" + "".join(lastRace.split(" ")[1::]) + "EPrix" + " #FormulaE #Racing"
 
     # Iterate over new docs
     for folder, docs in documents.items():
@@ -196,7 +196,7 @@ def postDocs(lastSeason, lastRace, documents, log, board):
 
             # Tweet!
             tweet(postTitle + "\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
-            
+
     # Get tweets -> Like them
     favTweets(hashtags, 1)
 
