@@ -148,22 +148,6 @@ def tweet(tweetStr):
         yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Failed to Tweet - " + os.path.basename(__file__), str(ex) + "\n\n" + tweetStr)
 
 
-def favTweets(tags, numbTweets):
-    tags = tags.replace(" ", " OR ")
-    tweets = tweepy.Cursor(api.search_tweets, q=tags).items(numbTweets)
-    tweets = [tw for tw in tweets]
-
-    for tw in tweets:
-        try:
-            tw.favorite()
-            print(str(tw.id) + " - Like")
-        except Exception as e:
-            print(str(tw.id) + " - " + str(e))
-            pass
-
-    return True
-
-
 def batchDelete():
     print("Deleting all tweets from the account @" + api.verify_credentials().screen_name)
     for status in tweepy.Cursor(api.user_timeline).items():
@@ -196,9 +180,6 @@ def postDocs(lastSeason, lastRace, documents, log, board):
 
             # Tweet!
             tweet(postTitle + "\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
-
-    # Get tweets -> Like them
-    favTweets(hashtags, 1)
 
     # Save Log
     logfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
