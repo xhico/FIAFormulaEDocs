@@ -179,7 +179,7 @@ def postDocs(lastSeason, lastRace, documents, log, board):
             getScreenshots(pdfURL)
 
             # Tweet!
-            tweet(postTitle + "\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
+            tweet(postTitle + "\n\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
 
     # Save Log
     logfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
@@ -188,6 +188,8 @@ def postDocs(lastSeason, lastRace, documents, log, board):
 
 
 def main():
+    # batchDelete()
+
     print("getTimingResults")
     timings = getResults("timings")
     print("getNoticesResults")
