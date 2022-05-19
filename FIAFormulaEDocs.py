@@ -48,10 +48,12 @@ def getResults(board):
     # Get last season && name
     lastSeason = results["folders"][0]["children"][-1]
     lastSeasonName, championshipDocs, eventDocs = lastSeason["name"], [], []
+    print("lastSeasonName - " + lastSeasonName)
 
     # Get last race
     lastRace = lastSeason["children"][-1]
     lastRaceName = lastRace["name"]
+    print("lastRaceName - " + lastRaceName)
 
     # Get Folder
     for folder in lastRace["children"]:
@@ -173,7 +175,7 @@ def postDocs(lastSeason, lastRace, documents, log, board):
             print(postTitle)
 
             # Set date
-            postDate = datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y/%m/%d %H:%m UTC")
+            postDate = datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y/%m/%d %H:%M UTC")
 
             # Screenshot DPF
             pdfURL = doc["url"].replace(" ", "%20")
@@ -200,19 +202,16 @@ def main():
     lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog = parseDocuments(timings, "timings")
     print("parseDocuments - notices")
     lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog = parseDocuments(notices, "notices")
-    print()
 
     print("postDocs - timings")
     postDocs(lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog, "timings")
-    print()
     print("postDocs - notices")
     postDocs(lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog, "notices")
-
-    print("------------------")
 
 
 if __name__ == "__main__":
     print("----------------------------------------------------")
+    print(datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y/%m/%d %H:%M UTC"))
 
     # Set temp folder -> Create logs and tmp folder
     tmpFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
@@ -238,3 +237,5 @@ if __name__ == "__main__":
             # Remove isRunning file
             os.remove(ISRUNNING_FILE)
             print("End")
+            print("----------------------------------------------------")
+
