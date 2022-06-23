@@ -13,7 +13,7 @@ import yagmail
 import pdf2image
 import shutil
 import re
-
+import psutil
 import requests
 
 
@@ -219,22 +219,17 @@ if __name__ == "__main__":
     # Set Results URLs
     timingsURL = "https://results.fiaformulae.com/en/s3/feed/v2/results.json"
     noticesURL = "https://results.fiaformulae.com/en/s3/feed/noticeboard/v2/results.json"
-    ISRUNNING_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "isRunning.tmp")
 
-    # Check if isRunning file exists
-    if os.path.exists(ISRUNNING_FILE):
+    # Check if script is already running
+    procs = [proc for proc in psutil.process_iter(attrs=["cmdline"]) if os.path.basename(__file__) in '\t'.join(proc.info["cmdline"])]
+    if len(procs) > 2:
         print("isRunning")
     else:
-        # Create isRunning file
-        open(ISRUNNING_FILE, "x")
-
         try:
             main()
         except Exception as ex:
             print(ex)
             yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Error - " + os.path.basename(__file__), str(ex))
         finally:
-            # Remove isRunning file
-            os.remove(ISRUNNING_FILE)
             print("End")
 
