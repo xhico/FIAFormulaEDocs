@@ -16,25 +16,13 @@ import re
 import psutil
 import requests
 import traceback
+import logging
 
 
 def get911(key):
     with open('/home/pi/.911') as f:
         data = json.load(f)
     return data[key]
-
-
-CONSUMER_KEY = get911('TWITTER_FORMULAE_CONSUMER_KEY')
-CONSUMER_SECRET = get911('TWITTER_FORMULAE_CONSUMER_SECRET')
-ACCESS_TOKEN = get911('TWITTER_FORMULAE_ACCESS_TOKEN')
-ACCESS_TOKEN_SECRET = get911('TWITTER_FORMULAE_ACCESS_TOKEN_SECRET')
-EMAIL_USER = get911('EMAIL_USER')
-EMAIL_APPPW = get911('EMAIL_APPPW')
-EMAIL_RECEIVER = get911('EMAIL_RECEIVER')
-
-auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-api = tweepy.API(auth)
 
 
 def getResults(board):
@@ -49,12 +37,12 @@ def getResults(board):
     # Get last season && name
     lastSeason = results["folders"][0]["children"][-1]
     lastSeasonName, championshipDocs, eventDocs = lastSeason["name"], [], []
-    print("lastSeasonName - " + lastSeasonName)
+    logger.info("lastSeasonName - " + lastSeasonName)
 
     # Get last race
     lastRace = lastSeason["children"][-1]
     lastRaceName = lastRace["name"]
-    print("lastRaceName - " + lastRaceName)
+    logger.info("lastRaceName - " + lastRaceName)
 
     # Get Folder
     for folder in lastRace["children"]:
@@ -135,7 +123,7 @@ def getScreenshots(pdfURL):
             page.save(jpgFile)
         hasPics = True
     except Exception:
-        print("Failed to screenshot")
+        logger.error("Failed to screenshot")
         hasPics = False
 
     return hasPics
@@ -146,14 +134,14 @@ def tweet(tweetStr):
         imageFiles = sorted([os.path.join(tmpFolder, file) for file in os.listdir(tmpFolder) if file.split(".")[-1] == "jpg"])
         media_ids = [api.media_upload(os.path.join(tmpFolder, image)).media_id_string for image in imageFiles]
         api.update_status(status=tweetStr, media_ids=media_ids)
-        print("Tweeted")
+        logger.info("Tweeted")
     except Exception as ex:
-        print("Failed to Tweet")
+        logger.error("Failed to Tweet")
         yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Failed to Tweet - " + os.path.basename(__file__), str(ex) + "\n\n" + tweetStr)
 
 
 def batchDelete():
-    print("Deleting all tweets from the account @" + api.verify_credentials().screen_name)
+    logger.info("Deleting all tweets from the account @" + api.verify_credentials().screen_name)
     for status in tweepy.Cursor(api.user_timeline).items():
         try:
             api.destroy_status(status.id)
@@ -173,7 +161,7 @@ def postDocs(lastSeason, lastRace, documents, log, board):
             postTitle = doc["name"]
             postTitle = re.sub("[^a-zA-Z0-9 \n.]", " ", postTitle).replace(".PDF", "").replace(".pdf", "")
             postTitle = re.sub('\\s+', ' ', postTitle)
-            print(postTitle)
+            logger.info(postTitle)
 
             # Set date
             postDate = datetime.datetime.strftime(datetime.datetime.utcnow(), "%Y/%m/%d %H:%M UTC")
@@ -186,33 +174,47 @@ def postDocs(lastSeason, lastRace, documents, log, board):
             tweet(postTitle + "\n\n" + "Published at: " + postDate + "\n\n" + pdfURL + "\n\n" + hashtags)
 
     # Save Log
-    logfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
-    with open(logfile, "w") as outFile:
+    boardLogfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_" + board + ".json")
+    with open(boardLogfile, "w") as outFile:
         json.dump(log, outFile, indent=2)
 
 
 def main():
-    # batchDelete()
-
-    print("getTimingResults")
+    logger.info("getTimingResults")
     timings = getResults("timings")
-    print("getNoticesResults")
+    logger.info("getNoticesResults")
     notices = getResults("notices")
 
-    print("parseDocuments - timings")
+    logger.info("parseDocuments - timings")
     lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog = parseDocuments(timings, "timings")
-    print("parseDocuments - notices")
+    logger.info("parseDocuments - notices")
     lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog = parseDocuments(notices, "notices")
 
-    print("postDocs - timings")
+    logger.info("postDocs - timings")
     postDocs(lastTimingsSeasonName, lastTimingsRaceName, newTimings, timingsLog, "timings")
-    print("postDocs - notices")
+    logger.info("postDocs - notices")
     postDocs(lastNoticesSeasonName, lastNoticesName, newNotices, noticesLog, "notices")
 
 
 if __name__ == "__main__":
-    print("----------------------------------------------------")
-    print(str(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
+    # Set Logging
+    LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.path.abspath(__file__).replace(".py", ".log"))
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()])
+    logger = logging.getLogger()
+
+    CONSUMER_KEY = get911('TWITTER_FORMULAE_CONSUMER_KEY')
+    CONSUMER_SECRET = get911('TWITTER_FORMULAE_CONSUMER_SECRET')
+    ACCESS_TOKEN = get911('TWITTER_FORMULAE_ACCESS_TOKEN')
+    ACCESS_TOKEN_SECRET = get911('TWITTER_FORMULAE_ACCESS_TOKEN_SECRET')
+    EMAIL_USER = get911('EMAIL_USER')
+    EMAIL_APPPW = get911('EMAIL_APPPW')
+    EMAIL_RECEIVER = get911('EMAIL_RECEIVER')
+
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+    api = tweepy.API(auth)
+
+    logger.info("----------------------------------------------------")
 
     # Set temp folder -> Create logs and tmp folder
     tmpFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
@@ -224,13 +226,12 @@ if __name__ == "__main__":
     # Check if script is already running
     procs = [proc for proc in psutil.process_iter(attrs=["cmdline"]) if os.path.basename(__file__) in '\t'.join(proc.info["cmdline"])]
     if len(procs) > 2:
-        print("isRunning")
+        logger.info("isRunning")
     else:
         try:
             main()
         except Exception as ex:
-            print(traceback.format_exc())
+            logger.error(traceback.format_exc())
             yagmail.SMTP(EMAIL_USER, EMAIL_APPPW).send(EMAIL_RECEIVER, "Error - " + os.path.basename(__file__), str(traceback.format_exc()))
         finally:
-            print("End")
-
+            logger.info("End")

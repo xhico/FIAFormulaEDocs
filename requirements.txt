@@ -1,4 +1,0 @@
-yagmail
-tweepy
-pdf2image
-psutil
