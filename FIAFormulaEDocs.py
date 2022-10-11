@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # !/usr/bin/python3
 
-# python3 -m pip install yagmail tweepy pdf2image --no-cache-dir
+# python3 -m pip install yagmail tweepy pdf2image psutil --no-cache-dir
 # sudo apt install poppler-utils -y
+
 import datetime
 import json
 import os
