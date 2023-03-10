@@ -44,7 +44,7 @@ def getResults(board):
     if "children" not in lastRace.keys():
         logger.error("No children in " + lastRaceName)
         return {}
-        
+
     for folder in lastRace["children"]:
         if folder["name"] == "ABB FIA Formula E World Championship":
             try:
