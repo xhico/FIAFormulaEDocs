@@ -1,0 +1,12 @@
+[Unit]
+Description=FIAFormulaEDocs Service
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/FIAFormulaEDocs/
+ExecStart=/usr/bin/python3 /home/pi/FIAFormulaEDocs/FIAFormulaEDocs.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
