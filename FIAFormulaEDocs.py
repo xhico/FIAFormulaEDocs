@@ -51,10 +51,6 @@ def getResults(board):
         }
     """
 
-    # Define URLs for timing and notice results.
-    timingsURL = "http://example.com/timings.json"
-    noticesURL = "http://example.com/notices.json"
-
     # Download JSON Timing Results
     if board == "timings":
         results = json.loads(requests.get(timingsURL).content)
