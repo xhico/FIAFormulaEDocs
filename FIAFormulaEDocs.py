@@ -179,7 +179,7 @@ def getScreenshots(pdfURL):
     """
     try:
         # Reset tmpFolder
-        tmpFolder = "./tmp"
+        tmpFolder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp")
         if os.path.exists(tmpFolder):
             shutil.rmtree(tmpFolder)
         os.mkdir(tmpFolder)
@@ -188,15 +188,8 @@ def getScreenshots(pdfURL):
         pdfFile = os.path.join(tmpFolder, "tmp.pdf")
         urllib.request.urlretrieve(pdfURL, pdfFile)
 
-        # Check what OS
-        if os.name == "nt":
-            # Set poppler_path for Windows
-            poppler_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "poppler-win\Library\bin")
-            # Convert PDF to images using poppler_path
-            pages = pdf2image.convert_from_path(poppler_path=poppler_path, pdf_path=pdfFile)
-        else:
-            # Convert PDF to images using default settings
-            pages = pdf2image.convert_from_path(pdf_path=pdfFile)
+        # Convert PDF to images using default settings
+        pages = pdf2image.convert_from_path(pdf_path=pdfFile)
 
         # Save the first four pages as JPGs
         for idx, page in enumerate(pages[0:4]):
