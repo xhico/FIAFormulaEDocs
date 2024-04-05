@@ -4,18 +4,20 @@
 
 import datetime
 import json
+import logging
 import os
-import urllib.request
-import urllib.parse
-import tweepy
-import yagmail
-import pdf2image
-import shutil
 import re
+import shutil
+import traceback
+import urllib.parse
+import urllib.request
+
+import pdf2image
 import psutil
 import requests
-import traceback
-import logging
+import tweepy
+import yagmail
+
 from Misc import get911, sendErrorEmail
 
 
